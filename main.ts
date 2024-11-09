@@ -1,14 +1,14 @@
 import { config } from "https://deno.land/x/dotenv/mod.ts";
 import {
-  Client,
+  // Client,
   Message,
   event,
   CommandClient,
   command,
   CommandContext,
-  GatewayIntents,
+  // GatewayIntents,
   MessageAttachment,
-  Interaction
+  // Interaction
 } from "./deps.ts";
 
 // Ensure that the yt-dlp executable is in your PATH or specify the full path to yt-dlp in the command
@@ -59,7 +59,7 @@ class MyClient extends CommandClient {
 
         // Send the video in response
         await message.reply({
-          content: `Here's the video you requested:\nOriginal message:\n\`\`\`${message.content}\`\`\``,
+          content: `Here's the video you requested:\n\`\`\`${message.content}\`\`\``,
           files: [attachment],
         });
         console.log("Video sent in response to a link!");
@@ -68,7 +68,7 @@ class MyClient extends CommandClient {
         await Deno.remove(videoPath);
       } catch (error) {
         console.error("Error handling the video:", error);
-        await message.reply(`There was an error downloading or sending the video.\nOriginal message:\n\`\`\`${message.content}\`\`\``);
+        await message.reply(`There was an error downloading or sending the video.\n\`\`\`${message.content}\`\`\``);
       }
       // Delete the original message
       await message.delete();
