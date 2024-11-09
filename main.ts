@@ -45,7 +45,10 @@ class MyClient extends CommandClient {
   // Add file-sending functionality
   @event()
   async messageCreate(message: Message): Promise<void> {
-    if (message.content.startsWith("https://www.instagram.com/reel")) {
+    const instagramPattern = /^https:\/\/www\.instagram\.com\/reel/;
+    const tiktokPattern = /^https:\/\/www\.tiktok\.com\/@.+\/video/;
+    if (instagramPattern.test(message.content) || tiktokPattern.test(message.content)) {
+      console.log("Message with link detected!");
       const link = message.content;
       try {
         // Download the video
@@ -59,12 +62,12 @@ class MyClient extends CommandClient {
           content: `Here's the video you requested:\nOriginal message:\n\`\`\`${message.content}\`\`\``,
           files: [attachment],
         });
-        console.log("Video sent in response to Instagram link!");
+        console.log("Video sent in response to a link!");
 
         // Delete the downloaded video
         await Deno.remove(videoPath);
       } catch (error) {
-        console.error("Error handling Instagram video:", error);
+        console.error("Error handling the video:", error);
         await message.reply(`There was an error downloading or sending the video.\nOriginal message:\n\`\`\`${message.content}\`\`\``);
       }
       // Delete the original message
@@ -82,14 +85,14 @@ async function downloadInstagramVideo(link: string): Promise<string> {
   const videoPath = "./videos/downloaded_video.mp4";
 
   // Set up the yt-dlp command to download the video
-  const command = new Deno.Command(YT_DLP_PATH, {
+  const downloadVideo = new Deno.Command(YT_DLP_PATH, {
     args: [link, "-o", videoPath],
     stdout: "piped",
     stderr: "piped",
   });
 
   // Run the command
-  const { success, stderr } = await command.output();
+  const { success, stderr } = await downloadVideo.output();
 
   if (!success) {
     console.error("Failed to download video:", new TextDecoder().decode(stderr));
