@@ -1,0 +1,13 @@
+# Ignore .env files for environment-specific configurations
+.env
+
+# Deno-specific files
+deno.lock
+*.log
+
+# Common system files
+.DS_Store
+Thumbs.db
+
+# Node compatibility libraries (if used in Deno projects with Node modules)
+node_modules/
