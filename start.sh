@@ -35,6 +35,20 @@ else
     fi
 fi
 
+# Ensure Deno is installed
+if ! command_exists deno; then
+    echo "Deno not found. Installing Deno..."
+    curl -fsSL https://deno.land/install.sh | sh
+    if [ $? -ne 0 ]; then
+        echo "Failed to install Deno. Exiting."
+        exit 1
+    fi
+    echo "Deno installed successfully. Ensure your PATH includes ~/.deno/bin."
+    export PATH="$HOME/.deno/bin:$PATH"
+else
+    echo "Deno is already installed."
+fi
+
 # Install Deno dependencies if deno.json exists
 if [ -f "deno.json" ]; then
     echo "Installing Deno dependencies..."
