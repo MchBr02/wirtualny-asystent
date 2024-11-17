@@ -13,6 +13,7 @@ if [ "$EUID" -eq 0 ]; then
 else
     echo "Running as normal user: $(whoami)"
     HOME_DIR="$HOME"
+    NORMAL_USER=$(logname)
 fi
 
 # Ensure yt-dlp is installed
