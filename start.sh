@@ -1,107 +1,92 @@
 #!/bin/bash
 
+LOG_FILE="start.log"
+
+# Function to log messages to console and log file
+log() {
+    echo "$(date +"%Y-%m-%d %H:%M:%S") - $1" | tee -a "$LOG_FILE"
+}
+
 # Function to check if a command exists
 command_exists() {
     command -v "$1" &> /dev/null
 }
 
-# Check if running as root
+# Determine user and home directory
 if [ "$EUID" -eq 0 ]; then
-    echo "Warning: Running as root. Ensuring normal user access for Deno installation."
-    NORMAL_USER=$(logname)
+    log "Running as root. Switching to normal user for Deno installation."
+    NORMAL_USER=$(logname 2>/dev/null || whoami)
     HOME_DIR=$(eval echo "~$NORMAL_USER")
 else
-    echo "Running as normal user: $(whoami)"
+    NORMAL_USER=$(whoami)
     HOME_DIR="$HOME"
-    NORMAL_USER=$(logname)
 fi
 
 # Ensure yt-dlp is installed
 if ! command_exists yt-dlp; then
-    echo "yt-dlp not found. Installing yt-dlp..."
+    log "Installing yt-dlp..."
     sudo curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
-    if [ $? -ne 0 ]; then
-        echo "Failed to download yt-dlp. Exiting."
-        exit 1
-    fi
     sudo chmod +x /usr/local/bin/yt-dlp
-    echo "yt-dlp installed successfully."
+    log "yt-dlp installed successfully."
 else
-    echo "yt-dlp is already installed. Checking for updates..."
+    log "Updating yt-dlp..."
     sudo curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp.new
-    if [ $? -eq 0 ] && ! cmp -s /usr/local/bin/yt-dlp /usr/local/bin/yt-dlp.new; then
+    if ! cmp -s /usr/local/bin/yt-dlp /usr/local/bin/yt-dlp.new; then
         sudo mv /usr/local/bin/yt-dlp.new /usr/local/bin/yt-dlp
         sudo chmod +x /usr/local/bin/yt-dlp
-        echo "yt-dlp updated successfully."
+        log "yt-dlp updated successfully."
     else
-        echo "yt-dlp is up-to-date."
         sudo rm -f /usr/local/bin/yt-dlp.new
+        log "yt-dlp is up-to-date."
     fi
 fi
 
 # Ensure Deno is installed
 if ! command_exists deno; then
-    echo "Deno not found. Installing Deno..."
-    sudo -u $NORMAL_USER curl -fsSL https://deno.land/install.sh | sudo -u $NORMAL_USER bash
+    log "Installing Deno..."
+    sudo -u "$NORMAL_USER" bash -c "curl -fsSL https://deno.land/install.sh | bash"
     if [ $? -ne 0 ]; then
-        echo "Failed to install Deno. Exiting."
+        log "Failed to install Deno. Exiting."
         exit 1
     fi
-    echo "Deno installed successfully."
+    log "Deno installed successfully."
 else
-    echo "Deno is already installed."
+    log "Deno is already installed."
 fi
 
-# Ensure Deno is in the PATH
-if ! grep -q 'export PATH="$HOME/.deno/bin:$PATH"' "$HOME_DIR/.bashrc"; then
-    echo 'export PATH="$HOME/.deno/bin:$PATH"' | sudo -u "$NORMAL_USER" tee -a "$HOME_DIR/.bashrc"
-    echo "Added Deno to PATH in $HOME_DIR/.bashrc."
-fi
+# Add Deno to PATH
+export PATH="$HOME_DIR/.deno/bin:/usr/local/bin:$PATH"
 
-# Reload PATH in the current session
-if ! echo "$PATH" | grep -q "$HOME_DIR/.deno/bin"; then
-    echo "Reloading .bashrc to update PATH..."
-    source "$HOME_DIR/.bashrc"
-fi
-
-# Verify Deno PATH
+# Verify Deno
 if ! command_exists deno; then
-    echo "Deno command still not found in PATH. Please restart your terminal and try again."
+    log "Deno command not found in PATH. Exiting."
     exit 1
 fi
 
-# Install Deno dependencies if deno.json exists
+# Check for deno.json and install dependencies
 if [ -f "deno.json" ]; then
-    echo "Installing Deno dependencies..."
-    deno cache main.ts
-    if [ $? -ne 0 ]; then
-        echo "Failed to install Deno dependencies. Exiting."
-        exit 1
-    fi
+    log "Installing Deno dependencies..."
+    deno cache main.ts || { log "Failed to install Deno dependencies. Exiting."; exit 1; }
 else
-    echo "deno.json not found. Skipping Deno dependencies installation."
+    log "No deno.json found. Skipping dependencies."
 fi
 
-# Check if .env file exists
-if [ -f ".env" ]; then
-    echo ".env file found. Checking for DISCORD_TOKEN..."
-    if grep -q "DISCORD_TOKEN=" .env && [ -n "$(grep 'DISCORD_TOKEN=' .env | cut -d '=' -f2)" ]; then
-        echo "DISCORD_TOKEN is set."
-    else
-        echo "DISCORD_TOKEN is missing or empty in .env. Exiting."
-        exit 1
-    fi
-else
-    echo ".env file not found. Exiting."
+# Verify .env file
+if [ ! -f ".env" ]; then
+    log ".env file not found. Exiting."
+    exit 1
+fi
+if ! grep -q "DISCORD_TOKEN=" .env || [ -z "$(grep 'DISCORD_TOKEN=' .env | cut -d '=' -f2)" ]; then
+    log "DISCORD_TOKEN is missing or empty in .env. Exiting."
     exit 1
 fi
 
-# Start the Deno script with necessary permissions
-echo "Starting the Deno script..."
+# Start the application
+log "Starting the application..."
 deno run --allow-all main.ts
 if [ $? -ne 0 ]; then
-    echo "Failed to start the Deno script. Exiting."
+    log "Failed to start the application. Exiting."
     exit 1
 fi
 
-echo "Script completed successfully."
+log "Application started successfully."
