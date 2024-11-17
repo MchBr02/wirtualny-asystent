@@ -34,13 +34,14 @@ else
         echo "yt-dlp updated successfully."
     else
         echo "yt-dlp is up-to-date."
-        rm -f /usr/local/bin/yt-dlp.new
+        sudo rm -f /usr/local/bin/yt-dlp.new
     fi
 fi
 
 # Ensure Deno is installed
 if ! command_exists deno; then
     echo "Deno not found. Installing Deno..."
+    cat "sudo -u $NORMAL_USER curl -fsSL https://deno.land/install.sh | sudo -u $NORMAL_USER bash"
     sudo -u $NORMAL_USER curl -fsSL https://deno.land/install.sh | sudo -u $NORMAL_USER bash
     if [ $? -ne 0 ]; then
         echo "Failed to install Deno. Exiting."
