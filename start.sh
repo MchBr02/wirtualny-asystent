@@ -54,13 +54,20 @@ fi
 
 # Ensure Deno is in the PATH
 if ! grep -q 'export PATH="$HOME/.deno/bin:$PATH"' "$HOME_DIR/.bashrc"; then
-    echo 'export PATH="$HOME/.deno/bin:$PATH"' | sudo tee -a "$HOME_DIR/.bashrc"
-    echo "Added Deno to PATH in $HOME_DIR/.bashrc. Please restart the shell or source the file."
+    echo 'export PATH="$HOME/.deno/bin:$PATH"' | sudo -u "$NORMAL_USER" tee -a "$HOME_DIR/.bashrc"
+    echo "Added Deno to PATH in $HOME_DIR/.bashrc."
 fi
 
-# Reload PATH if not present in current shell
+# Reload PATH in the current session
 if ! echo "$PATH" | grep -q "$HOME_DIR/.deno/bin"; then
-    export PATH="$HOME_DIR/.deno/bin:$PATH"
+    echo "Reloading .bashrc to update PATH..."
+    source "$HOME_DIR/.bashrc"
+fi
+
+# Verify Deno PATH
+if ! command_exists deno; then
+    echo "Deno command still not found in PATH. Please restart your terminal and try again."
+    exit 1
 fi
 
 # Install Deno dependencies if deno.json exists
