@@ -75,6 +75,20 @@ else
     echo "deno.json not found. Skipping Deno dependencies installation."
 fi
 
+# Check if .env file exists
+if [ -f ".env" ]; then
+    echo ".env file found. Checking for DISCORD_TOKEN..."
+    if grep -q "DISCORD_TOKEN=" .env && [ -n "$(grep 'DISCORD_TOKEN=' .env | cut -d '=' -f2)" ]; then
+        echo "DISCORD_TOKEN is set."
+    else
+        echo "DISCORD_TOKEN is missing or empty in .env. Exiting."
+        exit 1
+    fi
+else
+    echo ".env file not found. Exiting."
+    exit 1
+fi
+
 # Start the Deno script with necessary permissions
 echo "Starting the Deno script..."
 deno run --allow-all main.ts
