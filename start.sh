@@ -6,6 +6,7 @@ LOG_FILE="start.log"
 log() {
     echo "$(date +"%Y-%m-%d %H:%M:%S") - $1" | tee -a "$LOG_FILE"
 }
+log "=====Start====="
 
 # Function to check if a command exists
 command_exists() {
