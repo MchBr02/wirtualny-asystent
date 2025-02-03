@@ -48,7 +48,7 @@ class MyClient extends CommandClient {
   // Add file-sending functionality
   @event()
   async messageCreate(message: Message): Promise<void> {
-    if (message.content.startsWith("https://www.instagram.com/reel/")) {
+    if ( (message.content.startsWith("https://www.instagram.com/reel/")) || (message.content.startsWith("https://www.instagram.com/share/reel/")) ) {
       try {
         // Load the file as an attachment
         const attachment = await MessageAttachment.load("./test.txt", "test.txt");
