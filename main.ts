@@ -16,6 +16,7 @@ import {
 // Ensure that the yt-dlp executable is in your PATH or specify the full path to yt-dlp in the command
 const YT_DLP_PATH = "yt-dlp"; // Change this to the full path if yt-dlp is not in your PATH
 const LOG_RETENTION_DAYS = 7; // Set the number of days to retain logs
+const LLM_MODEL = "deepseek-r1:1.5b";
 
 // Load environment variables
 const { DISCORD_TOKEN } = config();
@@ -66,6 +67,62 @@ async function cleanupOldLogs(logDir: string, retentionDays: number): Promise<vo
   }
 }
 
+const pullLLMModel = async (model: string): Promise<void> => {
+  try {
+      const process = new Deno.Command("ollama", {
+          args: ["pull", model],
+          stdout: "piped",
+          stderr: "piped",
+      });
+      const { success, stdout, stderr } = await process.output();
+
+      if (!success) {
+          console.error("Error pulling LLM model:", new TextDecoder().decode(stderr));
+          throw new Error("Failed to pull LLM model");
+      }
+
+      console.log("Successfully pulled LLM model:", model);
+  } catch (error) {
+      console.error("Error executing ollama pull:", error);
+  }
+};
+
+await pullLLMModel(LLM_MODEL);
+
+const detectLanguage = async (text: string): Promise<string | null> => {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(text)}`;
+    
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        
+        const data: { [key: string]: any } = await response.json();
+        return data[2]; // Language detected
+    } catch (error) {
+        console.error("Error detecting language:", error);
+        return null;
+    }
+};
+
+const translateText = async (text: string, targetLang: string = "en"): Promise<string | null> => {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+    
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        
+        const data: { [key: string]: any } = await response.json();
+        return data[0].map((item: any) => item[0]).join(" ");
+    } catch (error) {
+        console.error("Error translating text:", error);
+        return null;
+    }
+};
+
 class MyClient extends CommandClient {
   constructor() {
     super({
@@ -93,45 +150,69 @@ class MyClient extends CommandClient {
 
   @command({ aliases: 'AI' })
   async ask(ctx: CommandContext): Promise<void> {
-    await logMessage(`Command: ${ctx.message.content}`);
-    try {
-      const question = ctx.message.content.replace(/^!ask\s*/, "").trim();
-      
-      if (!question) {
-        await ctx.message.reply("Please provide a question!");
-        return;
-      }
+      await logMessage(`Command: ${ctx.message.content}`);
+      try {
+          const question = ctx.message.content.replace(/^!ask\s*/, "").trim();
+          if (!question) {
+              await ctx.message.reply("Please provide a question!");
+              return;
+          }
 
-      await logMessage(`Question from ${ctx.author.tag}: ${question}`);
-      
-      const response = await this.queryOllamaLlava(question);
-      await ctx.message.reply(`**Question:** ${question}\n**Answer:** ${response}`);
-      
-      await logMessage(`Answered question from ${ctx.author.tag}`);
-    } catch (error) {
-      await logMessage(`Error in ask command: ${error}`);
-      await ctx.message.reply("Sorry, there was an error processing your question.");
-    }
+          await logMessage(`Question from ${ctx.author.tag}: ${question}`);
+          const detectedLanguage = await detectLanguage(question);
+          if (!detectedLanguage) {
+              await ctx.message.reply("Error detecting language.");
+              return;
+          }
+
+          let translatedQuestion = question;
+          if (detectedLanguage !== "en") {
+              translatedQuestion = await translateText(question, "en") || question;
+          }
+          
+          const response = await this.queryOllamaModel(translatedQuestion, LLM_MODEL);
+          let translatedResponse = response;
+          if (detectedLanguage !== "en") {
+              translatedResponse = await translateText(response, detectedLanguage) || response;
+          }
+
+          // Ensure message length does not exceed Discord limit
+          const maxMessageLength = 4000;
+          if (translatedResponse.length > maxMessageLength) {
+              const responseChunks = translatedResponse.match(/.{1,3900}/g) || [];
+              await ctx.message.reply(`**Question:** ${question}\n**Answer:** ${responseChunks[0]}`);
+              for (let i = 1; i < responseChunks.length; i++) {
+                  await ctx.message.channel.send(responseChunks[i]);
+              }
+          } else {
+              await ctx.message.reply(`**Question:** ${question}\n**Answer:** ${translatedResponse}`);
+          }
+
+          await logMessage(`Answered question from ${ctx.author.tag}`);
+      } catch (error) {
+          await logMessage(`Error in ask command: ${error}`);
+          await ctx.message.reply("Sorry, there was an error processing your question.");
+      }
   }
 
-  private async queryOllamaLlava(prompt: string): Promise<string> {
-    try {
-      const process = new Deno.Command("ollama", {
-        args: ["run", "llava", prompt],
-        stdout: "piped",
-        stderr: "piped",
-      });
-      const { success, stdout, stderr } = await process.output();
+  private async queryOllamaModel(prompt: string, model: string): Promise<string> {
+      try {
+          const process = new Deno.Command("ollama", {
+              args: ["run", model, prompt],
+              stdout: "piped",
+              stderr: "piped",
+          });
+          const { success, stdout, stderr } = await process.output();
 
-      if (!success) {
-        console.error("Ollama llava error:", new TextDecoder().decode(stderr));
-        throw new Error("Ollama llava failed");
+          if (!success) {
+              console.error("Ollama error:", new TextDecoder().decode(stderr));
+              throw new Error("Ollama model execution failed");
+          }
+
+          return new TextDecoder().decode(stdout).trim();
+      } catch (error) {
+          throw new Error(`Ollama Error: ${error}`);
       }
-
-      return new TextDecoder().decode(stdout).trim();
-    } catch (error) {
-      throw new Error(`Ollama llava Error: ${error}`);
-    }
   }
 
   @event()

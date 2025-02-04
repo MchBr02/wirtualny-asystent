@@ -85,19 +85,6 @@ else
     log "Ollama is already installed."
 fi
 
-# Ensure Llava model is installed
-if ! ollama list | grep -q "llava"; then
-    log "Downloading Llava model..."
-    ollama pull llava
-    if [ $? -ne 0 ]; then
-        log "Failed to download Llava model. Exiting."
-        exit 1
-    fi
-    log "Llava model installed successfully."
-else
-    log "Llava model is already installed."
-fi
-
 # Verify .env file
 if [ ! -f ".env" ]; then
     log ".env file not found. Exiting."
