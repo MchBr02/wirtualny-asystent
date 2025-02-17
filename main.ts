@@ -1,6 +1,8 @@
 // main.ts
 
 import { config } from "https://deno.land/x/dotenv/mod.ts";
+import { MongoClient } from "https://deno.land/x/mongo/mod.ts";
+import { startServer } from "./server.ts"; // Import the web server function
 import {
   // Client,
   Message,
@@ -12,6 +14,7 @@ import {
   MessageAttachment,
   // Interaction
 } from "./deps.ts";
+// import { messageUpdate } from "https://deno.land/x/harmony@v2.9.1/src/gateway/handlers/messageUpdate.ts";
 
 // Ensure that the yt-dlp executable is in your PATH or specify the full path to yt-dlp in the command
 const YT_DLP_PATH = "yt-dlp"; // Change this to the full path if yt-dlp is not in your PATH
@@ -19,7 +22,7 @@ const LOG_RETENTION_DAYS = 7; // Set the number of days to retain logs
 const LLM_MODEL = "deepseek-r1:1.5b";
 
 // Load environment variables
-const { DISCORD_TOKEN } = config();
+const { DISCORD_TOKEN, MONGO_URI, MONGO_DB_NAME } = config();
 
 async function logMessage(message: string, filename?: string): Promise<void> {
   const logDir = "./logs";
@@ -74,7 +77,7 @@ const pullLLMModel = async (model: string): Promise<void> => {
           stdout: "piped",
           stderr: "piped",
       });
-      const { success, stdout, stderr } = await process.output();
+      const { success, stderr } = await process.output();
 
       if (!success) {
           console.error("Error pulling LLM model:", new TextDecoder().decode(stderr));
@@ -98,6 +101,7 @@ const detectLanguage = async (text: string): Promise<string | null> => {
             throw new Error(`HTTP error! Status: ${response.status}`);
         }
         
+        // deno-lint-ignore no-explicit-any
         const data: { [key: string]: any } = await response.json();
         return data[2]; // Language detected
     } catch (error) {
@@ -114,14 +118,34 @@ const translateText = async (text: string, targetLang: string = "en"): Promise<s
         if (!response.ok) {
             throw new Error(`HTTP error! Status: ${response.status}`);
         }
-        
+
+        // deno-lint-ignore no-explicit-any
         const data: { [key: string]: any } = await response.json();
+        // deno-lint-ignore no-explicit-any
         return data[0].map((item: any) => item[0]).join(" ");
     } catch (error) {
         console.error("Error translating text:", error);
         return null;
     }
 };
+
+// MongoDB setup
+const client = new MongoClient();
+await client.connect(MONGO_URI);
+const db = client.database(MONGO_DB_NAME || "test");
+const messagesCollection = db.collection("messages");
+
+async function checkAndCreateMessagesCollection() {
+  const collections = await db.listCollectionNames();
+  if (!collections.includes("messages")) {
+    console.log("Creating 'messages' collection...");
+    await db.createCollection("messages");
+  } else {
+    console.log("Collection 'messages' already exists.");
+  }
+}
+
+await checkAndCreateMessagesCollection();
 
 class MyClient extends CommandClient {
   constructor() {
@@ -177,7 +201,7 @@ class MyClient extends CommandClient {
           }
 
           // Ensure message length does not exceed Discord limit
-          const maxMessageLength = 4000;
+          const maxMessageLength = 2000;
           if (translatedResponse.length > maxMessageLength) {
               const responseChunks = translatedResponse.match(/.{1,3900}/g) || [];
               await ctx.message.reply(`**Question:** ${question}\n**Answer:** ${responseChunks[0]}`);
@@ -217,8 +241,33 @@ class MyClient extends CommandClient {
 
   @event()
   async messageCreate(message: Message): Promise<void> {
-    await logMessage(`${message.author.displayName} / ${message.author.username} said ${message.content}`);
+    if (message.content != "") {await logMessage(`${message.author.displayName} / ${message.author.username} said: "${message.content}"`);}
+    if (message.embeds.length > 0) { // Check if embeds exist and prevent accessing undefined properties
+      if (message.embeds[0].title != "" && message.embeds[0].title != undefined) {await logMessage(`${message.author.displayName} / ${message.author.username} embed title: "${message.embeds[0].title}"`);} 
+      if (message.embeds[0].description != "" && message.embeds[0].description != undefined) {await logMessage(`${message.author.displayName} / ${message.author.username} embed description: "${message.embeds[0].description}"`);}
+    }
     await this.processVideoLink(message);
+
+    if (message.content.trim() !== "") {
+      await this.logMessageToMongoDB(message);
+    }
+  }
+
+  async logMessageToMongoDB(message: Message): Promise<void> {
+    try {
+      const doc = {
+        message_id: message.id,
+        timestamp: new Date(),
+        content: message.content,
+        sender: message.author.username,
+        receiver: message.channelID ? message.channelID : "N/A",
+        platform: "Discord",
+      };
+      await messagesCollection.insertOne(doc);
+      console.log("Message logged to MongoDB.");
+    } catch (error) {
+      console.error("Error logging message to MongoDB:", error);
+    }
   }
 
   async processVideoLink(message: Message): Promise<void> {
@@ -284,3 +333,6 @@ class MyClient extends CommandClient {
 }
 
 new MyClient().connect();
+
+// Start the web server on port 80
+startServer(db);
