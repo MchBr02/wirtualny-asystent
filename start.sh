@@ -260,6 +260,18 @@ fi
 
 # Run functions
 install_mongodb
+
+# Wait for MongoDB to be ready
+log "Waiting for MongoDB to start..."
+for i in {1..10}; do
+    if docker exec mongodb mongosh --eval "db.runCommand({ ping: 1 })" &>/dev/null; then
+        log "MongoDB is now ready!"
+        break
+    fi
+    log "MongoDB not ready yet. Retrying in 2 seconds..."
+    sleep 2
+done
+
 check_mongodb_admin
 
 # Start the application
