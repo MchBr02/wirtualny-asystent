@@ -23,7 +23,7 @@ command_exists() {
 
 # Function to check if user has Docker permissions
 ensure_docker_permissions() {
-    if groups | grep -q "\bdocker\b"; then
+    if groups | grep "docker"; then
         log "User already has Docker permissions."
     else
         log "User does not have Docker permissions. Adding to docker group..."
