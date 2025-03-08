@@ -60,61 +60,73 @@ install_docker() {
 install_mongodb() {
     if command_exists mongod; then
         log "MongoDB is already installed."
-    elif docker ps | grep -q mongodb; then
+        return
+    fi
+
+    # Check if MongoDB is running in Docker
+    if docker ps | grep -q mongodb; then
         log "MongoDB is already running inside Docker."
-    else
-        log "MongoDB not found. Installing..."
+        return
+    fi
 
-        # Check for ARM architecture
-        ARCH=$(uname -m)
-        if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
-            log "ARM architecture detected. Installing MongoDB via Docker..."
+    log "MongoDB not found. Installing..."
 
-            install_docker
+    # Check for ARM architecture
+    ARCH=$(uname -m)
+    if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+        log "ARM architecture detected. Installing MongoDB via Docker..."
 
-            # Run MongoDB in Docker
-            sudo docker run -d \
-                --name mongodb \
-                -p 27017:27017 \
-                -e MONGO_INITDB_ROOT_USERNAME=$MONGO_ADMIN_USER \
-                -e MONGO_INITDB_ROOT_PASSWORD=$MONGO_ADMIN_PASS \
-                -v ~/mongodb_data:/data/db \
-                arm64v8/mongo:5.0
+        install_docker
 
-            if [ $? -ne 0 ]; then
-                log "Failed to start MongoDB in Docker. Exiting."
-                exit 1
-            fi
-
-            log "MongoDB installed and running in Docker."
-        else
-            log "Installing MongoDB via APT..."
-            
-            sudo apt-get update && sudo apt-get install -y gnupg curl
-            if [ $? -ne 0 ]; then
-                log "Failed to install dependencies (gnupg, curl). Exiting."
-                exit 1
-            fi
-
-            log "Importing MongoDB public GPG key..."
-            curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | \
-                sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
-
-            log "Adding MongoDB repository..."
-            echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
-            
-            sudo apt-get update && sudo apt-get install -y mongodb-org
-            if [ $? -ne 0 ]; then
-                log "MongoDB installation failed! Exiting."
-                exit 1
-            fi
-
-            # Start and enable MongoDB
-            sudo systemctl start mongod
-            sudo systemctl enable mongod
-
-            log "MongoDB installed and running."
+        # Check if an old MongoDB container exists and remove it
+        if docker ps -a --format '{{.Names}}' | grep -q "^mongodb$"; then
+            log "Old MongoDB container found. Removing..."
+            docker stop mongodb
+            docker rm mongodb
         fi
+
+        # Run MongoDB in Docker
+        docker run -d \
+            --name mongodb \
+            -p 27017:27017 \
+            -e MONGO_INITDB_ROOT_USERNAME=$MONGO_ADMIN_USER \
+            -e MONGO_INITDB_ROOT_PASSWORD=$MONGO_ADMIN_PASS \
+            -v ~/mongodb_data:/data/db \
+            arm64v8/mongo:5.0
+
+        if [ $? -ne 0 ]; then
+            log "Failed to start MongoDB in Docker. Exiting."
+            exit 1
+        fi
+
+        log "MongoDB installed and running in Docker."
+    else
+        log "Installing MongoDB via APT..."
+        
+        sudo apt-get update && sudo apt-get install -y gnupg curl
+        if [ $? -ne 0 ]; then
+            log "Failed to install dependencies (gnupg, curl). Exiting."
+            exit 1
+        fi
+
+        log "Importing MongoDB public GPG key..."
+        curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | \
+            sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
+
+        log "Adding MongoDB repository..."
+        echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
+        
+        sudo apt-get update && sudo apt-get install -y mongodb-org
+        if [ $? -ne 0 ]; then
+            log "MongoDB installation failed! Exiting."
+            exit 1
+        fi
+
+        # Start and enable MongoDB
+        sudo systemctl start mongod
+        sudo systemctl enable mongod
+
+        log "MongoDB installed and running."
     fi
 }
 
