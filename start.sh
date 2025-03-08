@@ -208,6 +208,7 @@ else
 fi
 
 log "Current user is: $USER"
+log "PATH = $PATH"
 
 # Ensure Deno is installed
 if ! command -v deno &> /dev/null; then
