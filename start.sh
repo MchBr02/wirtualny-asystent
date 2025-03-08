@@ -143,18 +143,18 @@ check_mongodb_admin() {
     # Check if using Docker
     if docker ps | grep -q mongodb; then
         log "Using MongoDB in Docker."
-        mongosh_cmd="sudo docker exec -i mongodb mongosh"
+        mongosh_cmd="docker exec -i mongodb mongosh --quiet --username \"$username\" --password \"$password\" --authenticationDatabase \"admin\""
     else
-        mongosh_cmd="mongosh"
+        mongosh_cmd="mongosh --quiet --username \"$username\" --password \"$password\" --authenticationDatabase \"admin\""
     fi
 
     # Check if admin user exists
     local user_exists
-    user_exists=$($mongosh_cmd --quiet --eval "db.getSiblingDB('admin').system.users.find({user: '$username'}).count()")
-
+    user_exists=$($mongosh_cmd --eval "db.getSiblingDB('admin').system.users.find({user: '$username'}).count()" | tail -n 1)
+    
     if [[ "$user_exists" -eq 1 ]]; then
         log "MongoDB admin user exists. Verifying password..."
-        auth_result=$($mongosh_cmd --username "$username" --password "$password" --authenticationDatabase "admin" --eval "db.runCommand({ connectionStatus: 1 })" --quiet)
+        auth_result=$($mongosh_cmd --eval "db.runCommand({ connectionStatus: 1 })" --quiet)
 
         if [[ "$auth_result" == *"ok: 1"* ]]; then
             log "Admin credentials are correct."
