@@ -210,7 +210,7 @@ fi
 log "Current user is: $USER"
 
 # Ensure Deno is installed
-if ! command_exists deno; then
+if ! command -v deno &> /dev/null; then
     log "Installing Deno..."
     sudo -u "$NORMAL_USER" bash -c "curl -fsSL https://deno.land/install.sh | bash"
     if [ $? -ne 0 ]; then
