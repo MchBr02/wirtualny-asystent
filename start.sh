@@ -21,10 +21,23 @@ command_exists() {
     command -v "$1" &> /dev/null
 }
 
+# Function to check if user has Docker permissions
+ensure_docker_permissions() {
+    if groups | grep -q "\bdocker\b"; then
+        log "User already has Docker permissions."
+    else
+        log "User does not have Docker permissions. Adding to docker group..."
+        sudo usermod -aG docker $USER
+        log "User added to docker group. Restarting shell..."
+        exec su -l $USER
+    fi
+}
+
 # Function to install Docker if not already installed
 install_docker() {
     if command_exists docker; then
         log "Docker is already installed."
+        ensure_docker_permissions
     else
         log "Docker not found. Installing..."
         
@@ -39,6 +52,7 @@ install_docker() {
         # Ensure Docker starts on boot
         sudo systemctl start docker
         sudo systemctl enable docker
+        ensure_docker_permissions
     fi
 }
 
