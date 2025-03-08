@@ -207,7 +207,11 @@ else
     fi
 fi
 
-log "Current user is: $USER"
+
+# Ensure PATH includes Deno before checking for it
+export PATH="$HOME/.deno/bin:$PATH"
+
+# Debugging: Log the PATH
 log "PATH = $PATH"
 
 # Ensure Deno is installed
