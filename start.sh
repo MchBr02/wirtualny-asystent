@@ -21,30 +21,86 @@ command_exists() {
     command -v "$1" &> /dev/null
 }
 
+# Function to install Docker if not already installed
+install_docker() {
+    if command_exists docker; then
+        log "Docker is already installed."
+    else
+        log "Docker not found. Installing..."
+        
+        sudo apt-get update && sudo apt-get install -y docker.io
+        if [ $? -ne 0 ]; then
+            log "Docker installation failed! Exiting."
+            exit 1
+        fi
+
+        log "Docker installed successfully."
+
+        # Ensure Docker starts on boot
+        sudo systemctl start docker
+        sudo systemctl enable docker
+    fi
+}
+
 # Function to check if MongoDB is installed and install if necessary
 install_mongodb() {
-    if ! command -v mongod &> /dev/null; then
-        log "MongoDB not found. Installing..."
-        sudo apt-get update
-        sudo apt-get install -y gnupg curl
-        
-        # Import MongoDB public GPG key
-        curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | \
-            sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
-
-        # Add MongoDB repository
-        echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
-
-        # Install MongoDB
-        sudo apt-get update
-        sudo apt-get install -y mongodb-org
-
-        # Start MongoDB service
-        sudo systemctl start mongod
-        sudo systemctl enable mongod
-        log "MongoDB installation complete."
-    else
+    if command_exists mongod; then
         log "MongoDB is already installed."
+    elif docker ps | grep -q mongodb; then
+        log "MongoDB is already running inside Docker."
+    else
+        log "MongoDB not found. Installing..."
+
+        # Check for ARM architecture
+        ARCH=$(uname -m)
+        if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+            log "ARM architecture detected. Installing MongoDB via Docker..."
+
+            install_docker
+
+            # Run MongoDB in Docker
+            sudo docker run -d \
+                --name mongodb \
+                -p 27017:27017 \
+                -e MONGO_INITDB_ROOT_USERNAME=$MONGO_ADMIN_USER \
+                -e MONGO_INITDB_ROOT_PASSWORD=$MONGO_ADMIN_PASS \
+                -v ~/mongodb_data:/data/db \
+                arm64v8/mongo:5.0
+
+            if [ $? -ne 0 ]; then
+                log "Failed to start MongoDB in Docker. Exiting."
+                exit 1
+            fi
+
+            log "MongoDB installed and running in Docker."
+        else
+            log "Installing MongoDB via APT..."
+            
+            sudo apt-get update && sudo apt-get install -y gnupg curl
+            if [ $? -ne 0 ]; then
+                log "Failed to install dependencies (gnupg, curl). Exiting."
+                exit 1
+            fi
+
+            log "Importing MongoDB public GPG key..."
+            curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | \
+                sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
+
+            log "Adding MongoDB repository..."
+            echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
+            
+            sudo apt-get update && sudo apt-get install -y mongodb-org
+            if [ $? -ne 0 ]; then
+                log "MongoDB installation failed! Exiting."
+                exit 1
+            fi
+
+            # Start and enable MongoDB
+            sudo systemctl start mongod
+            sudo systemctl enable mongod
+
+            log "MongoDB installed and running."
+        fi
     fi
 }
 
@@ -58,14 +114,22 @@ check_mongodb_admin() {
         exit 1
     fi
 
+    # Check if using Docker
+    if docker ps | grep -q mongodb; then
+        log "Using MongoDB in Docker."
+        mongosh_cmd="sudo docker exec -i mongodb mongosh"
+    else
+        mongosh_cmd="mongosh"
+    fi
+
     # Check if admin user exists
     local user_exists
-    user_exists=$(mongosh --quiet --eval "db.getSiblingDB('admin').system.users.find({user: '$username'}).count()")
+    user_exists=$($mongosh_cmd --quiet --eval "db.getSiblingDB('admin').system.users.find({user: '$username'}).count()")
 
     if [[ "$user_exists" -eq 1 ]]; then
         log "MongoDB admin user exists. Verifying password..."
-        auth_result=$(mongosh --username "$username" --password "$password" --authenticationDatabase "admin" --eval "db.runCommand({ connectionStatus: 1 })" --quiet)
-        
+        auth_result=$($mongosh_cmd --username "$username" --password "$password" --authenticationDatabase "admin" --eval "db.runCommand({ connectionStatus: 1 })" --quiet)
+
         if [[ "$auth_result" == *"ok: 1"* ]]; then
             log "Admin credentials are correct."
         else
@@ -74,7 +138,7 @@ check_mongodb_admin() {
         fi
     else
         log "Creating MongoDB admin user..."
-        mongosh <<EOF
+        $mongosh_cmd <<EOF
 use admin
 db.createUser({
     user: "$username",
