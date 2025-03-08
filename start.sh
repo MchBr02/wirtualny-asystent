@@ -186,6 +186,8 @@ else
     HOME_DIR="$HOME"
 fi
 
+echo "Current user is: $USER"
+
 # Ensure yt-dlp is installed
 if ! command_exists yt-dlp; then
     log "Installing yt-dlp..."
@@ -204,6 +206,8 @@ else
         log "yt-dlp is up-to-date."
     fi
 fi
+
+echo "Current user is: $USER"
 
 # Ensure Deno is installed
 if ! command_exists deno; then
