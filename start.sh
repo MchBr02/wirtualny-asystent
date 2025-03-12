@@ -29,7 +29,7 @@ ensure_docker_permissions() {
         log "User does not have Docker permissions. Adding to docker group..."
         sudo usermod -aG docker $USER
         log "User added to docker group. Restarting shell..."
-        exec su -l $USER
+        newgrp docker
     fi
 }
 
