@@ -22,7 +22,7 @@ const LOG_RETENTION_DAYS = 7; // Set the number of days to retain logs
 const LLM_MODEL = "deepseek-r1:1.5b";
 
 // Load environment variables
-const { DISCORD_TOKEN, MONGO_URL, MONGO_DB_NAME } = config();
+const { DISCORD_TOKEN, MONGO_ADMIN_USER, MONGO_ADMIN_PASS, MONGO_DB_NAME } = config();
 
 async function logMessage(message: string, filename?: string): Promise<void> {
   const logDir = "./logs";
@@ -131,7 +131,7 @@ const translateText = async (text: string, targetLang: string = "en"): Promise<s
 
 // MongoDB setup
 const client = new MongoClient();
-await client.connect(MONGO_URL);
+await client.connect(`mongodb://${MONGO_ADMIN_USER}:${MONGO_ADMIN_PASS}@localhost:27017/admin?authSource=admin`);
 const db = client.database(MONGO_DB_NAME || "test");
 const messagesCollection = db.collection("messages");
 
