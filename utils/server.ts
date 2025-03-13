@@ -1,7 +1,7 @@
 // server.ts
 
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
-import { Database } from "https://deno.land/x/mongo@v0.31.2/mod.ts";
+import { Database } from "https://deno.land/x/mongo@v0.34.0/mod.ts";
 
 export function startServer(db: Database) {
   const messagesCollection = db.collection("messages");
