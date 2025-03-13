@@ -4,9 +4,8 @@ import { handleAIQuery } from "./utils/ai.ts";
 import { downloadVideo } from "./utils/video.ts";
 import { CommandClient, event, command, CommandContext, Message, MessageAttachment } from "./deps.ts";
 import { startServer } from "./utils/server.ts";
+import { getWeather } from "./utils/weatherapi.ts";
 // import { detectLanguage, translateText } from "./utils/translator.ts";
-
-// const LLM_MODEL = "deepseek-r1:1.5b";
 
 const db = await connectToDatabase();
 
@@ -24,6 +23,33 @@ class MyClient extends CommandClient {
   @command()
   ping(ctx: CommandContext): void {
     ctx.message.reply("Pong!");
+  }
+
+  @command()
+  async weather(ctx: CommandContext): Promise<void> {
+      try {
+          const location = ctx.message.content.replace(/^!weather\s*/, "").trim();
+          if (!location) {
+              await ctx.message.reply("Please provide a location!");
+              return;
+          }
+  
+          await logMessage(`Weather request for: ${location} by ${ctx.author.tag}`);
+  
+          const weatherData = await getWeather(location);
+          
+          if (weatherData.error) {
+              await ctx.message.reply(weatherData.error);
+              return;
+          }
+  
+          const weatherMessage = `🌍 **Location:** ${weatherData.location}\n🌡 **Temperature:** ${weatherData.temperature}\n🌥 **Condition:** ${weatherData.condition}\n💨 **Wind:** ${weatherData.wind}\n💧 **Humidity:** ${weatherData.humidity}`;
+          
+          await ctx.message.reply(weatherMessage);
+      } catch (error) {
+          console.error("Weather command error:", error);
+          await ctx.message.reply("Error retrieving weather data.");
+      }
   }
 
   @command({ aliases: 'AI' })

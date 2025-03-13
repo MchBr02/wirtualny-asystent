@@ -48,6 +48,7 @@ export async function queryOllamaModel(prompt: string, model: string): Promise<s
 
 
 export async function handleAIQuery(question: string): Promise<{ response: string; error?: string }> {
+  const defaultLanguage = "en";
   const detectedLanguage = await detectLanguage(question);
   if (!detectedLanguage) {
     return { response: "Error detecting language." };
@@ -55,18 +56,20 @@ export async function handleAIQuery(question: string): Promise<{ response: strin
   logMessage(`Detected language: ${detectedLanguage}`);
 
   let translatedQuestion = question;
-  if (detectedLanguage !== "en") {
-      translatedQuestion = await translateText(question, "en") || question;
+  if (detectedLanguage !== defaultLanguage) {
+      translatedQuestion = await translateText(question, defaultLanguage) || question;
       logMessage(`Translated question: ${translatedQuestion}`);
   }
 
   const llm_response = await queryOllamaModel(translatedQuestion, LLM_MODEL);
+  logMessage(`llm response: ${llm_response}`);
   
   // Formatting response
   let response = `**Question:** ${question}\n**Answer:** ${llm_response}`;
-  if (detectedLanguage !== "en") {
+  if (detectedLanguage !== defaultLanguage) {
       response = await translateText(response, detectedLanguage) || response;
   }
   
+  logMessage(`Final response: ${response}`);
   return { response };
 }
