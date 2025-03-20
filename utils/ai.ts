@@ -1,4 +1,5 @@
-import { detectLanguage, translateText } from "./translator.ts";
+// ai.ts
+
 import { logMessage } from "./logger.ts";
 
 const LLM_MODEL = "deepseek-r1:1.5b";
@@ -16,17 +17,21 @@ export async function pullLLMModel(model: string): Promise<void> {
     const { success, stderr } = await process.output();
 
     if (!success) {
-      console.error("Error pulling LLM model:", new TextDecoder().decode(stderr));
+      // console.error(`Error pulling LLM model: ${new TextDecoder().decode(stderr)}`);
+      logMessage(`Error pulling LLM model: ${new TextDecoder().decode(stderr)}`);
       throw new Error("Failed to pull LLM model");
     }
 
-    console.log("Successfully pulled LLM model:", model);
+    logMessage(`Successfully pulled LLM model: ${model}`);
   } catch (error) {
-    console.error("Error executing ollama pull:", error);
+    // console.error(`Error executing ollama pull: ${error}`);
+    logMessage(`Error executing ollama pull: ${error}`);
   }
 }
 
 export async function queryOllamaModel(prompt: string, model: string): Promise<string> {
+  logMessage(`queryOllamaModel model: ${model}`);
+  logMessage(`prompt: ${prompt}`);
   try {
     const process = new Deno.Command("ollama", {
       args: ["run", model, prompt],
@@ -36,40 +41,17 @@ export async function queryOllamaModel(prompt: string, model: string): Promise<s
     const { success, stdout, stderr } = await process.output();
 
     if (!success) {
-      console.error("Ollama error:", new TextDecoder().decode(stderr));
+      // console.error("Ollama error:", new TextDecoder().decode(stderr));
+      logMessage(`Ollama error: ${new TextDecoder().decode(stderr)}`);
       throw new Error("Ollama model execution failed");
     }
 
+    console.log(`Ollama response: ${new TextDecoder().decode(stdout).trim()}`);
     return new TextDecoder().decode(stdout).trim();
   } catch (error) {
+    // console.log(`Ollama Error: ${error}`);
+    logMessage(`Ollama Error: ${error}`);
     throw new Error(`Ollama Error: ${error}`);
   }
 }
 
-
-export async function handleAIQuery(question: string): Promise<{ response: string; error?: string }> {
-  const defaultLanguage = "en";
-  const detectedLanguage = await detectLanguage(question);
-  if (!detectedLanguage) {
-    return { response: "Error detecting language." };
-  }
-  logMessage(`Detected language: ${detectedLanguage}`);
-
-  let translatedQuestion = question;
-  if (detectedLanguage !== defaultLanguage) {
-      translatedQuestion = await translateText(question, defaultLanguage) || question;
-      logMessage(`Translated question: ${translatedQuestion}`);
-  }
-
-  const llm_response = await queryOllamaModel(translatedQuestion, LLM_MODEL);
-  logMessage(`llm response: ${llm_response}`);
-  
-  // Formatting response
-  let response = `**Question:** ${question}\n**Answer:** ${llm_response}`;
-  if (detectedLanguage !== defaultLanguage) {
-      response = await translateText(response, detectedLanguage) || response;
-  }
-  
-  logMessage(`Final response: ${response}`);
-  return { response };
-}

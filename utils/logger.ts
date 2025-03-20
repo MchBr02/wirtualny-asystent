@@ -1,10 +1,12 @@
+// logger.ts
+
 const LOG_RETENTION_DAYS = 7;
 
-export async function logMessage(message: string, filename?: string): Promise<void> {
+export async function logMessage(message: string): Promise<void> {
   const logDir = "./logs";
   const date = new Date();
-  const defaultLogFile = `${logDir}/${date.toISOString().split("T")[0]}.log`;
-  const logFile = filename ? `${logDir}/${filename}.log` : defaultLogFile;
+  const logFile = `${logDir}/${date.toISOString().split("T")[0]}.log`;
+  // const logFile = filename ? `${logDir}/${filename}.log` : defaultLogFile;
 
   try {
     await Deno.mkdir(logDir, { recursive: true });
@@ -14,6 +16,7 @@ export async function logMessage(message: string, filename?: string): Promise<vo
     await cleanupOldLogs(logDir, LOG_RETENTION_DAYS);
   } catch (error) {
     console.error("Logging error:", error);
+    console.log(`FileName: ${logFile}`);
   }
 }
 

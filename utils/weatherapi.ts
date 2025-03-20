@@ -1,4 +1,8 @@
-export async function getWeather(location: string): Promise<any> {
+// weatherapi.ts
+
+import { logMessage } from "./logger.ts";
+
+export async function getWeather(location: string) {
     const API_KEY = Deno.env.get("WEATHERAPI_KEY");
     if (!API_KEY) {
         throw new Error("WeatherAPI key is missing. Set WEATHERAPI_KEY in environment variables.");
@@ -8,6 +12,7 @@ export async function getWeather(location: string): Promise<any> {
 
     try {
         const response = await fetch(url);
+        logMessage(`${JSON.stringify(response)}`);
         if (!response.ok) {
             throw new Error(`Weather API error: ${response.status} ${response.statusText}`);
         }
