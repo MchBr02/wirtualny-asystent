@@ -1,8 +1,11 @@
 // ai.ts
 
 import { logMessage } from "./logger.ts";
-
-const LLM_MODEL = "deepseek-r1:1.5b";
+const LLMS = [
+  "deepseek-r1:1.5b", // Smallest deepseek model out there
+  "llava"
+]
+export const LLM_MODEL = LLMS[1];
 
 // Pull the LLM model before starting
 await pullLLMModel(`${LLM_MODEL}`);

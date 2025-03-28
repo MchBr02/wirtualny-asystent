@@ -1,8 +1,11 @@
 {
   "tasks": {
-    "dev": "deno run -A --watch main.ts"
+    "dev": "deno run -A --watch main.ts",
+    "run-all": "deno run --allow-all main.ts"
   },
   "imports": {
-    "@std/assert": "jsr:@std/assert@1"
-  }
+    "@std/assert": "jsr:@std/assert@1",
+    "@std/http": "jsr:@std/http@1.0.13"
+  },
+  "nodeModulesDir": "auto"
 }

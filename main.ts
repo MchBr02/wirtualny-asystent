@@ -3,7 +3,7 @@
 // import { connectToDatabase, logMessageToDB, saveMessageToDB } from "./utils/database.ts";
 import { connectToDatabase } from "./utils/database.ts";
 import { logMessage } from "./utils/logger.ts";
-import { queryOllamaModel } from "./utils/ai.ts";
+import { queryOllamaModel, LLM_MODEL } from "./utils/ai.ts";
 import { downloadVideo } from "./utils/video.ts";
 // import { CommandClient, event, command, CommandContext, Message, MessageAttachment } from "./deps.ts";
 import { startServer } from "./utils/server.ts";
@@ -13,7 +13,7 @@ import { discordClient } from "./utils/harmony.ts";
 import { detectLanguage, translateText } from "./utils/translator.ts";
 
 const db = await connectToDatabase();
-const LLM_MODEL = "deepseek-r1:1.5b";
+// const LLM_MODEL = "deepseek-r1:1.5b";
 
 
 
@@ -39,12 +39,17 @@ export async function messageHandler(message: string): Promise<string | null> {
       logMessage(`Translated message: ${translatedMessage}`);
   }
 
-  const categoryQuestion = `Assign given question to the appropriate action:
-  If the question concerns the weather, write: weather.
-  If the question is directed towards assistant or 'WA'/'wa', write: assistant.
-  If the question does not match the previous variables, write: other.
- 
-  Question: ${translatedMessage}`
+  const categoryQuestion = `
+  You are a classifier. Assign the given question to one of the following categories:
+  
+  - "weather" if the question is about the weather
+  - "assistant" if the question is directed at an assistant, WA, or 'wa'
+  - "other" for everything else
+  
+  Only respond with one word: weather, assistant, or other.
+  
+  Question: ${translatedMessage}
+  `.trim();
 
   let llm_category = await queryOllamaModel(categoryQuestion, LLM_MODEL);
   // Extract the last word
@@ -54,17 +59,20 @@ export async function messageHandler(message: string): Promise<string | null> {
 
   let llm_reply: string = ""; //"I am not sure how to respond to that.";
   
-  if(llm_category == "weather") {
-    const locationQuestion = `Assign given question to the appropriate location if one is given:
-    If location is not given than answer: unknown.
-    If cityname is given than give it as the answer, for example answer: cityname.
+  if(llm_category.toLowerCase() == "weather") {
+    logMessage(`logic for llm_category weather...`);
+    const locationQuestion = `Extract the city name from the following question for weather purposes.
+    - If a city is mentioned, respond only with the city name (e.g., answer: Paris).
+    - If no city is mentioned, respond with: unknown.
     
     Question: ${translatedMessage}`;
     let location = await queryOllamaModel(locationQuestion, LLM_MODEL);
     location = location.trim().split(/\s+/).pop() || "unknown";
     location = location.replace(/[^a-zA-Z]/g, ""); // Remove non-letter characters
+    location = replacePolishChars(location);
+    logMessage(`location: ${location}`);
 
-    if (location == "unknown") {
+    if (location.toLowerCase() == "unknown") {
       return "Please provide city or country name.";
     }
 
@@ -92,11 +100,12 @@ export async function messageHandler(message: string): Promise<string | null> {
     llm_reply = await queryOllamaModel(translatedMessage, LLM_MODEL);
   }
 
-  if (LLM_MODEL == "deepseek-r1:1.5b")  llm_reply = llm_reply.replace(/^.*<\/think>/is, "").trim(); // Remove everything up to and including "</think>"
+  if (LLM_MODEL == "deepseek-r1:1.5b")  {llm_reply = llm_reply.replace(/^.*<\/think>/is, "").trim();} // Remove everything up to and including "</think>"
+  logMessage(`llm_reply: " ${llm_reply} "`);
   let translatedReply = llm_reply;
   if (detectedLanguage !== defaultLanguage) {
     translatedReply = await translateText(llm_reply, detectedLanguage) || llm_reply;
-    logMessage(`Translated reply: ${translatedReply}`);
+    await logMessage(`Translated reply: " ${translatedReply} "`);
   }
 
   return `${translatedReply}`;
@@ -121,6 +130,17 @@ export async function videoLinkHandler(message: string): Promise<string | null> 
   return null; // No video link detected
 }
 
+
+function replacePolishChars(str: string): string {
+  const map: Record<string, string> = {
+    'ą': 'a', 'ć': 'c', 'ę': 'e', 'ł': 'l',
+    'ń': 'n', 'ó': 'o', 'ś': 's', 'ź': 'z', 'ż': 'z',
+    'Ą': 'A', 'Ć': 'C', 'Ę': 'E', 'Ł': 'L',
+    'Ń': 'N', 'Ó': 'O', 'Ś': 'S', 'Ź': 'Z', 'Ż': 'Z'
+  };
+
+  return str.replace(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g, (c: string): string => map[c] ?? c);
+}
 
 
 

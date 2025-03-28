@@ -318,7 +318,7 @@ check_mongodb_admin
 
 # Start the application
 log "Starting the application..."
-deno run --allow-all main.ts
+deno task run-all
 if [ $? -ne 0 ]; then
     log "Failed to start the application. Exiting."
     exit 1

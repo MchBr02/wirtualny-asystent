@@ -1,6 +1,6 @@
 // translator.ts
 
-import { logMessage } from "./logger.ts";
+// import { logMessage } from "./logger.ts";
 
 // export async function handleTranslation(message: string, defaultLanguage: string) {
 //     try {

@@ -25,7 +25,19 @@ async function cleanupOldLogs(logDir: string, retentionDays: number): Promise<vo
     for await (const entry of Deno.readDir(logDir)) {
       if (entry.isFile && entry.name.endsWith(".log")) {
         const filePath = `${logDir}/${entry.name}`;
-        const fileInfo = await Deno.stat(filePath);
+        
+        // const fileInfo = await Deno.stat(filePath);
+        let fileInfo;
+        try {
+          fileInfo = await Deno.stat(filePath);
+        } catch (err) {
+          if (err instanceof Deno.errors.NotFound) {
+            continue; // plik już nie istnieje, pomiń go
+          } else {
+            throw err; // inny błąd — rzuć dalej
+          }
+        }
+
         const fileAgeDays = (Date.now() - fileInfo.mtime!.getTime()) / (1000 * 60 * 60 * 24);
 
         if (fileAgeDays > retentionDays) {
