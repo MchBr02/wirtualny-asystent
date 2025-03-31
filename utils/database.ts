@@ -68,39 +68,54 @@ export async function fetchMessages(db: Database) {
 }
 
 
-
-
-
 /**
  * Checks if the 'users' collection exists and ensures it's properly set up.
+ * Additionally, checks if an admin user exists and creates one if not.
  */
 export async function checkUsersDatabase(db: Database): Promise<void> {
   try {
-    // Get list of collections in the database
+    // Check if the 'users' collection exists
     const collections = await db.listCollections().toArray();
     const usersCollectionExists = collections.some(col => col.name === "users");
 
     if (!usersCollectionExists) {
       logMessage("⚠️ 'users' collection not found. Creating...");
       await db.createCollection("users");
-
       logMessage("✅ 'users' collection created successfully.");
+    } else {
+      logMessage("✅ 'users' collection exists.");
+    }
 
-      // Insert an initial admin user
-      const usersCollection = db.collection("users");
+    // Check if the admin user exists
+    const usersCollection = db.collection("users");
+    const adminUser = await usersCollection.findOne({ login: "admin" });
+
+    if (!adminUser) {
+      logMessage("⚠️ Admin user not found. Creating default admin user...");
       await usersCollection.insertOne({
         user_id: crypto.randomUUID(),
         login: "admin",
         password: await hashPassword("admin123"), // Default admin password (hashed)
         email: "admin@example.com",
+        links: {} // Initialize as an empty object for future flexibility
       });
-
       logMessage("🔹 Default admin user created: login: 'admin', password: 'admin123'.");
     } else {
-      logMessage("✅ 'users' collection exists.");
+      logMessage("✅ Admin user already exists.");
     }
   } catch (error) {
-    logMessage(`❌ Error checking or creating 'users' collection: ${error}`);
+    logMessage(`❌ Error checking or creating 'users' collection or admin user: ${error}`);
     throw new Error("Database check failed.");
   }
+}
+
+
+export async function linkDiscordToUser(db: Database, userId: string, discordId: string) {
+  const usersCollection = db.collection("users");
+  await usersCollection.updateOne({ user_id: userId }, { $set: { discord_id: discordId } });
+}
+
+export async function findUserByDiscordId(db: Database, discordId: string) {
+  const usersCollection = db.collection("users");
+  return await usersCollection.findOne({ discord_id: discordId });
 }

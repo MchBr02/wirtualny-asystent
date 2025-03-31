@@ -68,32 +68,53 @@ export async function handleLogin(req: Request, db: Database): Promise<Response>
           const body = await req.json();
           login = body.login;
           password = body.password;
+          logMessage(`🔑 Received login request via JSON. Login: ${login}`);
         } else if (contentType.includes("application/x-www-form-urlencoded")) {
           // Handle form data
           const bodyText = await req.text();
           const params = new URLSearchParams(bodyText);
           login = params.get("login");
           password = params.get("password");
+          logMessage(`🔑 Received login request via Form Data. Login: ${login}`);
         } else {
-          return new Response("Unsupported content type", { status: 400 });
+            logMessage("❌ Unsupported content type for login.");
+            return new Response("Unsupported content type", { status: 400 });
         }
     
-        if (!login || !password) return new Response("Missing credentials", { status: 400 });
+        if (!login || !password) {
+            logMessage("❌ Missing credentials.");
+            return new Response("Missing credentials", { status: 400 });
+        }
+
         const usersCollection = db.collection("users");
 
         // Find user in the database
         const user = await usersCollection.findOne({ login });
-        if (!user) return new Response("User not found", { status: 404 });
+        if (!user) {
+            logMessage(`❌ User not found: ${login}`);
+            return new Response("User not found", { status: 404 });
+        }
+
+        logMessage(`🔍 User found: ${login} (User ID: ${user.user_id})`);
 
         // Hash the provided password for comparison
         const hashedPassword = await hashPassword(password);
-        if (user.password !== hashedPassword) return new Response("Invalid password", { status: 401 });
+        if (user.password !== hashedPassword) {
+            logMessage(`❌ Invalid password for user: ${login}`);
+            return new Response("Invalid password", { status: 401 });
+        }
 
         // Create a session token
         const sessionToken = crypto.randomUUID();
         sessions.set(sessionToken, user.user_id);
 
-        logMessage(`✅ User logged in: ${login}. Session token created.`);
+        logMessage(`✅ User logged in: ${login} (User ID: ${user.user_id}). Session token created: ${sessionToken}`);
+
+        if (user.discord_id) {
+            logMessage(`🔗 User ${login} is linked with Discord ID: ${user.discord_id}`);
+        } else {
+            logMessage(`🚫 User ${login} has no linked Discord ID.`);
+        }
 
         return new Response("Redirecting...", {
             status: 302,

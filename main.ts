@@ -55,11 +55,12 @@ export async function messageHandler(message: string): Promise<string | null> {
   // Extract the last word
   llm_category = llm_category.trim().split(/\s+/).pop() || "other";
   llm_category = llm_category.replace(/[^a-zA-Z]/g, ""); // Remove non-letter characters
+  llm_category = llm_category.toLowerCase();
   logMessage(`llm category: ${llm_category}`);
 
   let llm_reply: string = ""; //"I am not sure how to respond to that.";
   
-  if(llm_category.toLowerCase() == "weather") {
+  if(llm_category == "weather") {
     logMessage(`logic for llm_category weather...`);
     const locationQuestion = `Extract the city name from the following question for weather purposes.
     - If a city is mentioned, respond only with the city name (e.g., answer: Paris).
@@ -114,7 +115,8 @@ export async function messageHandler(message: string): Promise<string | null> {
 export async function videoLinkHandler(message: string): Promise<string | null> {
   if (
     message.match(/^https:\/\/www\.instagram\.com\/(reel|reels)\/[^/]+\/?$/) || 
-    message.match(/^https:\/\/www\.tiktok\.com\/@[^/]+\/video\/\d+\/?$/)
+    message.match(/^https:\/\/www\.tiktok\.com\/@[^/]+\/video\/\d+\/?$/) ||
+    message.match(/^https:\/\/www\.facebook\.com\/share\/r\/[^/]+\/?$/)
   ) {
     await logMessage(`🎥 Video link detected. Downloading: ${message}`);
 

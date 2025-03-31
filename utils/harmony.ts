@@ -7,7 +7,7 @@ import {
 }   from "../deps.ts"; //'https://deno.land/x/harmony/mod.ts'
 
 import { messageHandler, videoLinkHandler } from "../main.ts";
-import { connectToDatabase, saveMessageToDB } from "./database.ts";
+import { connectToDatabase, saveMessageToDB, linkDiscordToUser } from "./database.ts";
 import { logMessage } from "./logger.ts";
 
 const db = await connectToDatabase();
@@ -87,6 +87,31 @@ discordClient.on('messageCreate', async (msg: Message) => {
   if(msg.content == "!ping") {
     await msg.reply("Pong!"); return;
   }
+
+
+  // harmony.ts (inside discordClient.on('messageCreate', ...))
+  if (msg.content.startsWith("!link ")) {
+    const login = msg.content.split(" ")[1];
+    if (!login) {
+        await msg.reply("❌ Please provide a valid login. Usage: `!link your_login`");
+        return;
+    }
+
+    // Fetch the user from the database
+    const usersCollection = db.collection("users");
+    const user = await usersCollection.findOne({ login: login });
+
+    if (user) {
+        // Link Discord ID with the user login
+        await linkDiscordToUser(db, user.user_id, msg.author.id);
+        logMessage(`✅ Linked Discord user ${msg.author.username} with login ${login}`);
+        await msg.reply(`✅ Successfully linked your Discord account with login: ${login}`);
+    } else {
+        logMessage(`❌ No user found with login ${login}`);
+        await msg.reply("❌ User not found. Please check your login.");
+    }
+  }
+
 
   if(msg.author.bot != true) {
     // ✉️ Process text message if it's not a video link
