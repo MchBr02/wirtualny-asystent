@@ -92,7 +92,3 @@ Projekt zawiera skrypt `start.sh`, który automatyzuje proces instalacji i uruch
 ## Autor
 
 Projekt stworzony przez [MchBr02](https://github.com/MchBr02).
-
----
-
-*Pamiętaj, aby regularnie aktualizować zależności i przestrzegać najlepszych praktyk bezpieczeństwa podczas pracy z tokenami i danymi uwierzytelniającymi.* 
