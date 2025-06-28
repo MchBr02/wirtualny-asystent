@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:5.0
+    container_name: mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ADMIN_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ADMIN_PASS}
+    volumes:
+      - mongo_data:/data/db
+
+  denoapp:
+    container_name: denoapp
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - MONGO_DB_NAME=${MONGO_DB_NAME}
+      - MONGO_ADMIN_USER=${MONGO_ADMIN_USER}
+      - MONGO_ADMIN_PASS=${MONGO_ADMIN_PASS}
+      - WEATHERAPI_KEY=${WEATHERAPI_KEY}
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+    depends_on:
+      - mongodb
+      - ollama
+    volumes:
+      - deno_data:/app
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+  deno_data:
+  ollama_data:
