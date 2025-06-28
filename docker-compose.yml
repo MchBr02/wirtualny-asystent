@@ -3,7 +3,7 @@ version: '3.8'
 services:
   mongodb:
     image: mongo:5.0
-    container_name: mongodb
+    container_name: wa-mongodb
     restart: unless-stopped
     ports:
       - "27017:27017"
@@ -12,9 +12,11 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ADMIN_PASS}
     volumes:
       - mongo_data:/data/db
+    networks:
+      - wa-network
 
   denoapp:
-    container_name: denoapp
+    container_name: wa-denoapp
     build:
       context: .
       dockerfile: Dockerfile
@@ -29,18 +31,28 @@ services:
       - ollama
     volumes:
       - deno_data:/app
+    ports:
+      - "8080:8080"
+    networks:
+      - wa-network
     restart: unless-stopped
 
   ollama:
     image: ollama/ollama
-    container_name: ollama
+    container_name: wa-ollama
     ports:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+    networks:
+      - wa-network
     restart: unless-stopped
 
 volumes:
   mongo_data:
   deno_data:
   ollama_data:
+
+networks:
+  wa-network:
+    driver: bridge

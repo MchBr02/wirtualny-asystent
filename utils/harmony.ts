@@ -89,7 +89,6 @@ discordClient.on('messageCreate', async (msg: Message) => {
   }
 
 
-  // harmony.ts (inside discordClient.on('messageCreate', ...))
   if (msg.content.startsWith("!link ")) {
     const login = msg.content.split(" ")[1];
     if (!login) {
@@ -113,25 +112,33 @@ discordClient.on('messageCreate', async (msg: Message) => {
   }
 
 
-  if(msg.author.bot != true) {
-    // ✉️ Process text message if it's not a video link
-    const response = await messageHandler(msg.content);
-    if (response && response != "") {
+  if (msg.content.startsWith("!ask ")) {
+    const question = msg.content.split(" ")[1];
+    if (!question) {
+        await msg.reply("❌ Please provide a question. Usage: `!ask your question`");
+        return;
+    }
 
-    // Ensure message length does not exceed Discord limit
-      const maxMessageLength = 1999;
-      if (response.length > maxMessageLength) {
-        logMessage(`Message is to long. cutting it into smaller pieces.`);
-          const responseChunks = response.match(/.{1,1999}/g) || [];
-          
-          for (const chunk of responseChunks) {
-              if (chunk && chunk.trim().length > 0) {
-                logMessage(`Sending chunk: ${chunk}`);
-                  await msg.channel.send(chunk);
-              }
-          }
-      } else {
-        await msg.reply({ content: response });
+    if(msg.author.bot != true) {
+      // ✉️ Process text message if it's not a video link
+      const response = await messageHandler(msg.content);
+      if (response && response != "") {
+
+      // Ensure message length does not exceed Discord limit
+        const maxMessageLength = 1999;
+        if (response.length > maxMessageLength) {
+          logMessage(`Message is to long. cutting it into smaller pieces.`);
+            const responseChunks = response.match(/.{1,1999}/g) || [];
+            
+            for (const chunk of responseChunks) {
+                if (chunk && chunk.trim().length > 0) {
+                  logMessage(`Sending chunk: ${chunk}`);
+                    await msg.channel.send(chunk);
+                }
+            }
+        } else {
+          await msg.reply({ content: response });
+        }
       }
     }
   }

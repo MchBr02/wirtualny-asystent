@@ -8,6 +8,7 @@ import { logMessage } from "./logger.ts";
 
 import { renderLoginPage } from "../src/loginPage.ts";
 import { renderMessagesPage } from "../src/messagesPage.ts";
+import { handleApiRequest } from "./api.ts";
 
 function getClientIp(connInfo: Deno.ServeHandlerInfo): string {
   const addr = connInfo.remoteAddr;
@@ -37,6 +38,13 @@ export function startServer(db: Database) {
     ├─ Cookies: ${cookies}
     └─ Headers: ${JSON.stringify(headers, null, 2)}
     `);
+
+
+    // Handle /api
+    if (url.pathname.startsWith("/api/")) {
+      const apiResponse = await handleApiRequest(req);
+      return apiResponse ?? new Response("API endpoint not found", { status: 404 });
+    }
     
     // Handle routes
     if (req.method === "POST" && url.pathname === "/login") {
@@ -76,8 +84,14 @@ export function startServer(db: Database) {
         const discordLinkedUser = await findUserByDiscordId(db, user.links?.discord);
         if (discordLinkedUser) {
             logMessage(`✅ User authenticated: ${user.login} (User ID: ${user.user_id}) is linked with Discord ID: ${user.links?.discord}`);
+            // const messages = await fetchMessages(db);
+            // return new Response(renderMessagesPage(messages, user.login), { headers: { "Content-Type": "text/html" } });
+            const aiResponse = sessions.get(`response_${sessionToken}`) as string | undefined;
             const messages = await fetchMessages(db);
-            return new Response(renderMessagesPage(messages, user.login), { headers: { "Content-Type": "text/html" } });
+            return new Response(
+              renderMessagesPage(messages, user.login, aiResponse),
+              { headers: { "Content-Type": "text/html" } }
+            );
         } else {
             logMessage(`❌ User ${user.login} (User ID: ${user.user_id}) does not have a linked Discord account.`);
             return new Response("❌ Discord account not linked. Please link your account using `!link your_login`.", { headers: { "Content-Type": "text/plain" } });

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Test /api/message</title>
+</head>
+<body>
+  <h2>Test Virtual Assistant API</h2>
+
+  <label for="message">Enter your message:</label><br />
+  <textarea id="message" rows="4" cols="50">Jaka jest pogoda w Bielsko-Białej?</textarea><br><br>
+
+  <button onclick="sendMessage()">Send</button>
+
+  <h3>Response:</h3>
+  <pre id="responseArea"></pre>
+
+  <script>
+    async function sendMessage() {
+      const message = document.getElementById("message").value;
+      const responseArea = document.getElementById("responseArea");
+
+      try {
+        const response = await fetch("http://localhost:8080/api/message", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message })
+        });
+
+        const data = await response.json();
+        responseArea.textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        responseArea.textContent = "❌ Error: " + err;
+      }
+    }
+  </script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 // import { connectToDatabase, logMessageToDB, saveMessageToDB } from "./utils/database.ts";
 import { connectToDatabase } from "./utils/database.ts";
 import { logMessage } from "./utils/logger.ts";
-import { queryOllamaModel, LLM_MODEL } from "./utils/ai.ts";
+import { queryOllamaModel, LLM_MODEL, pullLLMModel } from "./utils/ai.ts";
 import { downloadVideo } from "./utils/video.ts";
 // import { CommandClient, event, command, CommandContext, Message, MessageAttachment } from "./deps.ts";
 import { startServer } from "./utils/server.ts";
@@ -11,9 +11,9 @@ import { getWeather } from "./utils/weatherapi.ts";
 import { discordClient } from "./utils/harmony.ts";
 // import { translateText } from "./utils/translator.ts";
 import { detectLanguage, translateText } from "./utils/translator.ts";
+import { config } from "https://deno.land/x/dotenv/mod.ts";
 
 const db = await connectToDatabase();
-// const LLM_MODEL = "deepseek-r1:1.5b";
 
 
 
@@ -97,7 +97,7 @@ export async function messageHandler(message: string): Promise<string | null> {
     llm_reply = await queryOllamaModel(weatherQuestion, LLM_MODEL);
   }
 
-  if(llm_category == "assistant") {
+  if(llm_category == "assistant" || llm_category == "other") {
     llm_reply = await queryOllamaModel(translatedMessage, LLM_MODEL);
   }
 
@@ -146,19 +146,47 @@ function replacePolishChars(str: string): string {
 
 
 
-try {
-  await discordClient.connect();
-  logMessage("✅ Successfully connected to Discord!");
-} catch (error) {
-  const err = error as Error;
-  console.error("❌ Discord API connection error:", error);
-  logMessage(`❌ Discord API connection error: ${err.message}`);
+async function connectDiscordWithRetry() {
+  let previousToken = Deno.env.get("DISCORD_TOKEN") ?? config().DISCORD_TOKEN;
 
-  if (err.message.includes("401")) {
-    console.error("❌ Invalid bot token. Check your DISCORD_TOKEN.");
+  while (true) {
+    try {
+      await discordClient.connect();
+      logMessage("✅ Successfully connected to Discord!");
+      break; // Exit loop on success
+    } catch (error) {
+      const err = error as Error;
+      console.error("❌ Discord API connection error:", error);
+      logMessage(`❌ Discord API connection error: ${err.message}`);
+
+      if (err.message.includes("401")) {
+        console.error("❌ Invalid bot token. Will retry in 30 seconds...");
+
+        // Wait 30 seconds
+        await new Promise((resolve) => setTimeout(resolve, 30000));
+
+        // Reload .env and compare tokens
+        const newEnv = config();
+        const newToken = newEnv.DISCORD_TOKEN;
+
+        if (newToken && newToken !== previousToken) {
+          console.log("🔄 New DISCORD_TOKEN detected, retrying with updated token.");
+          Deno.env.set("DISCORD_TOKEN", newToken);
+          previousToken = newToken;
+        } else {
+          console.log("🔁 Retrying Discord connection with same token...");
+        }
+
+        continue;
+      }
+
+      // Unknown error — retry after delay anyway
+      console.error("⚠️ Unexpected error. Retrying in 30 seconds...");
+      await new Promise((resolve) => setTimeout(resolve, 30000));
+    }
   }
-
-  Deno.exit(1); // Exit the process if the bot fails to connect
 }
 
+await pullLLMModel(`${LLM_MODEL}`);
+connectDiscordWithRetry();
 startServer(db);

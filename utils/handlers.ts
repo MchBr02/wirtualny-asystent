@@ -5,6 +5,7 @@ import { crypto } from "jsr:@std/crypto";
 
 import { logMessage } from "./logger.ts";
 import { hashPassword } from "./encoding.ts";
+import { messageHandler } from "../main.ts"; // na samej górze
 
 // Simulating a session store
 export const sessions = new Map();
@@ -108,6 +109,14 @@ export async function handleLogin(req: Request, db: Database): Promise<Response>
         const sessionToken = crypto.randomUUID();
         sessions.set(sessionToken, user.user_id);
 
+        
+        const initialMessage = "Jaka jest pogoda w Warszawie?";
+        const aiResponse = await messageHandler(initialMessage);
+        if (aiResponse) {
+            sessions.set(`response_${sessionToken}`, aiResponse);
+            logMessage(`📥 Initial AI response saved for session: ${aiResponse}`);
+        }
+
         logMessage(`✅ User logged in: ${login} (User ID: ${user.user_id}). Session token created: ${sessionToken}`);
 
         if (user.discord_id) {
@@ -134,22 +143,28 @@ export async function handleLogin(req: Request, db: Database): Promise<Response>
  */
 export async function handleLogout(req: Request): Promise<Response> {
     try {
-        const { session } = await req.json();
-        if (sessions.has(session)) {
-            sessions.delete(session);
-            logMessage(`✅ Session ended for token: ${session}`);
-            return new Response("Logged out successfully", {
-                status: 302,
-                headers: { "Location": "/", "Set-Cookie": "session=; Max-Age=0; Path=/" }
-            });
-        }
+      const cookieHeader = req.headers.get("cookie");
+      const sessionToken = cookieHeader?.match(/session=([^;]+)/)?.[1];
+  
+      if (sessionToken && sessions.has(sessionToken)) {
+        sessions.delete(sessionToken);
+        logMessage(`✅ Session ended for token: ${sessionToken}`);
+      } else {
         logMessage("❌ Invalid session logout attempt.");
-        return new Response("Invalid session", { status: 400 });
+      }
+  
+      return new Response("Logged out successfully", {
+        status: 302,
+        headers: {
+          "Location": "/",
+          "Set-Cookie": "session=; Max-Age=0; Path=/; HttpOnly",
+        },
+      });
     } catch (error) {
-        logMessage(`❌ Error processing logout: ${error}`);
-        return new Response("Error processing logout", { status: 500 });
+      logMessage(`❌ Error processing logout: ${error}`);
+      return new Response("Error processing logout", { status: 500 });
     }
-}
+  }
 
 /**
  * Handles posting messages

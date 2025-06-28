@@ -4,7 +4,7 @@
  * Returns the "Last 100 Messages" page
  */
 // deno-lint-ignore no-explicit-any
-export function renderMessagesPage(messages: any[], username: string): string {
+export function renderMessagesPage(messages: any[], username: string, responseMessage?: string): string {
     return `
   <!DOCTYPE html>
   <html lang="en">
@@ -20,6 +20,16 @@ export function renderMessagesPage(messages: any[], username: string): string {
     </style>
   </head>
   <body>
+  
+    <h1>Welcome, ${username}</h1>
+
+    ${
+      responseMessage
+        ? `<div class="ai-response"><strong>🤖 Assistant:</strong> ${responseMessage}</div>`
+        : ""
+    }
+
+    
     <h2>Last 100 Messages</h2>
     <table>
       <thead>

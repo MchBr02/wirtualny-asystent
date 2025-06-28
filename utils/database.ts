@@ -2,22 +2,29 @@
 
 import { MongoClient, Database } from "https://deno.land/x/mongo/mod.ts";
 import { config } from "https://deno.land/x/dotenv/mod.ts";
-import { hashPassword } from "./encoding.ts";
 
+import { hashPassword } from "./encoding.ts";
 import { logMessage } from "./logger.ts";
 
 const { MONGO_ADMIN_USER, MONGO_ADMIN_PASS, MONGO_DB_NAME } = config();
 
 export async function connectToDatabase(): Promise<Database> {
   try {
+    logMessage("🔧 Starting MongoDB connection...");
+    logMessage(`🔑 Using credentials: ${MONGO_ADMIN_USER}:${'*'.repeat(MONGO_ADMIN_PASS?.length || 0)}`);
+    logMessage(`📦 Database name: ${MONGO_DB_NAME}`);
+    
+    const mongoUrl = `mongodb://${MONGO_ADMIN_USER}:${MONGO_ADMIN_PASS}@wa-mongodb:27017/admin?authSource=admin`;
+    logMessage(`🌐 Connection string: ${mongoUrl}`);
+
     const client = new MongoClient();
-    await client.connect(`mongodb://${MONGO_ADMIN_USER}:${MONGO_ADMIN_PASS}@localhost:27017/admin?authSource=admin`);
+    await client.connect(mongoUrl);
+
+    logMessage("✅ Successfully connected to MongoDB server.");
 
     const db = client.database(MONGO_DB_NAME || "test");
+    logMessage(`📂 Selected database: ${db.name}`);
 
-    logMessage("✅ Connected to MongoDB.");
-
-    // ✅ Check if 'users' collection exists, create it if missing
     await checkUsersDatabase(db);
 
     return db;
